@@ -1,0 +1,14 @@
+﻿@startuml
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+package "com.vitalwatch.center.platform.shared" {
+    class ApplicationError
+    interface Result
+    class GlobalExceptionHandler
+    class ResponseEntityAssembler
+    class ErrorResponseAssembler
+    abstract class AbstractDomainAggregateRoot
+}
+
+@enduml
