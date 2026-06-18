@@ -2,6 +2,7 @@ package com.vitalwatch.center.platform.frontendcompat.interfaces.rest;
 
 import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.CreateFrontendInvitationResource;
 import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.FrontendInvitationResource;
+import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.PatchFrontendInvitationResource;
 import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.transform.FrontendInvitationResourceFromEntityAssembler;
 import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.transform.FrontendRoleMapper;
 import com.vitalwatch.center.platform.iam.domain.model.aggregates.UserInvitation;
@@ -49,8 +50,19 @@ public class InvitationsCompatibilityController {
     @Operation(summary = "Get frontend-compatible invitations")
     public ResponseEntity<List<FrontendInvitationResource>> getInvitations(
             @RequestParam(required = false) @Positive Long organizationId,
-            @RequestParam(required = false) @Positive Long hospitalWorkspaceId
+            @RequestParam(required = false) @Positive Long hospitalWorkspaceId,
+            @RequestParam(required = false) String token
     ) {
+        if (token != null && !token.isBlank()) {
+            var invitation = userInvitationRepository.findByToken(token.trim());
+
+            return ResponseEntity.ok(
+                    invitation.stream()
+                            .map(FrontendInvitationResourceFromEntityAssembler::toResourceFromEntity)
+                            .toList()
+            );
+        }
+
         var workspaceId = organizationId != null ? organizationId : hospitalWorkspaceId;
 
         if (workspaceId == null) {
@@ -70,6 +82,69 @@ public class InvitationsCompatibilityController {
     public ResponseEntity<FrontendInvitationResource> createInvitation(
             @Valid @RequestBody CreateFrontendInvitationResource resource
     ) {
+        return createInvitationInternal(resource);
+    }
+
+    @PostMapping("/send")
+    @Operation(summary = "Send frontend-compatible invitation")
+    public ResponseEntity<FrontendInvitationResource> sendInvitation(
+            @Valid @RequestBody CreateFrontendInvitationResource resource
+    ) {
+        return createInvitationInternal(resource);
+    }
+
+    @PatchMapping("/{invitationId}")
+    @Operation(summary = "Patch frontend-compatible invitation")
+    public ResponseEntity<FrontendInvitationResource> patchInvitation(
+            @PathVariable @Positive Long invitationId,
+            @Valid @RequestBody PatchFrontendInvitationResource resource
+    ) {
+        var invitation = userInvitationRepository.findById(invitationId);
+
+        if (invitation.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        try {
+            var invitationToUpdate = invitation.get();
+            var status = resource.status() == null ? "" : resource.status().trim().toUpperCase();
+
+            if ("ACCEPTED".equals(status)) {
+                invitationToUpdate.accept();
+            } else if ("CANCELLED".equals(status) || "CANCELED".equals(status)) {
+                invitationToUpdate.cancel();
+            } else if ("EXPIRED".equals(status)) {
+                invitationToUpdate.markAsExpired();
+            }
+
+            var savedInvitation = userInvitationRepository.save(invitationToUpdate);
+            return ResponseEntity.ok(FrontendInvitationResourceFromEntityAssembler.toResourceFromEntity(savedInvitation));
+
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().build();
+        } catch (IllegalStateException exception) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+    }
+
+    @DeleteMapping("/{invitationId}")
+    @Operation(summary = "Delete frontend-compatible invitation")
+    public ResponseEntity<Void> deleteInvitation(
+            @PathVariable @Positive Long invitationId
+    ) {
+        var invitation = userInvitationRepository.findById(invitationId);
+
+        invitation.ifPresent(value -> {
+            if (value.getStatus() == InvitationStatus.PENDING) {
+                value.cancel();
+                userInvitationRepository.save(value);
+            }
+        });
+
+        return ResponseEntity.noContent().build();
+    }
+
+    private ResponseEntity<FrontendInvitationResource> createInvitationInternal(CreateFrontendInvitationResource resource) {
         var workspaceId = resource.organizationId() != null
                 ? resource.organizationId()
                 : resource.hospitalWorkspaceId();

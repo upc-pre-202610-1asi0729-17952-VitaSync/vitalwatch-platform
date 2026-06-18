@@ -17,6 +17,7 @@ public record FrontendInvitationResource(
         String status,
         String token,
         String link,
+        Instant createdAt,
         Instant invitedAt,
         Instant expiresAt,
         Instant acceptedAt

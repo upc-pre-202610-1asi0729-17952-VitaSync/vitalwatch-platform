@@ -3,18 +3,14 @@ package com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
- * Frontend-compatible response for user accounts.
+ * Frontend-compatible request for creating user accounts.
  */
-@Schema(name = "FrontendUserResponse", description = "User response compatible with the Angular frontend")
-public record FrontendUserResource(
-        Long id,
+@Schema(name = "CreateFrontendUserRequest", description = "User creation request compatible with the Angular frontend")
+public record CreateFrontendUserResource(
         Long organizationId,
         Long hospitalWorkspaceId,
-        Long profileId,
         String firstName,
         String lastName,
-        String fullName,
-        String name,
         String email,
         String password,
         String phone,

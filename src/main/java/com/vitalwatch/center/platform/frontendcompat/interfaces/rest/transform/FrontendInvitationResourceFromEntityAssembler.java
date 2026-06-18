@@ -22,6 +22,7 @@ public final class FrontendInvitationResourceFromEntityAssembler {
                 entity.getToken(),
                 "/register/invitation?token=" + entity.getToken(),
                 entity.getInvitedAt(),
+                entity.getInvitedAt(),
                 entity.getExpiresAt(),
                 entity.getAcceptedAt()
         );
