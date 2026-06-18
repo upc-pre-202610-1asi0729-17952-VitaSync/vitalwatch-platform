@@ -1,0 +1,35 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: vitalwatch-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: vitalwatch_platform
+    ports:
+      - "3307:3306"
+    volumes:
+      - vitalwatch-mysql-data:/var/lib/mysql
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vitalwatch-platform-api
+    restart: unless-stopped
+    depends_on:
+      - mysql
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DATABASE_URL: mysql
+      DATABASE_PORT: 3306
+      DATABASE_NAME: vitalwatch_platform
+      DATABASE_USER: root
+      DATABASE_PASSWORD: password
+      JWT_SECRET: change-this-secret-before-production
+      PORT: 8080
+
+volumes:
+  vitalwatch-mysql-data:
