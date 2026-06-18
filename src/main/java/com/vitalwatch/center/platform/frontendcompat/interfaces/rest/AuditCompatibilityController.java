@@ -246,7 +246,7 @@ public class AuditCompatibilityController {
                 entity.getActionType().name(),
                 entity.getResourceType().name(),
                 entity.getResourceId(),
-                entity.getSeverity().name(),
+                toFrontendSeverity(entity.getSeverity().name()),
                 entity.getDescription(),
                 entity.getIpAddress(),
                 entity.getOccurredAt(),
@@ -291,11 +291,24 @@ public class AuditCompatibilityController {
     }
 
     private AuditSeverity resolveSeverity(String value) {
-        if (value == null || value.isBlank()) return AuditSeverity.MEDIUM;
-        try {
-            return AuditSeverity.valueOf(value.trim().toUpperCase().replace("-", "_"));
-        } catch (IllegalArgumentException exception) {
+        if (value == null || value.isBlank()) {
+            return AuditSeverity.LOW;
+        }
+
+        var normalized = value.trim().toUpperCase().replace("-", "_");
+
+        if ("INFO".equals(normalized)) {
+            return AuditSeverity.LOW;
+        }
+
+        if ("WARNING".equals(normalized)) {
             return AuditSeverity.MEDIUM;
+        }
+
+        try {
+            return AuditSeverity.valueOf(normalized);
+        } catch (IllegalArgumentException exception) {
+            return AuditSeverity.LOW;
         }
     }
 
@@ -331,4 +344,20 @@ public class AuditCompatibilityController {
 
         return "";
     }
+
+
+    private String toFrontendSeverity(String backendSeverity) {
+        if (backendSeverity == null || backendSeverity.isBlank()) {
+            return "INFO";
+        }
+
+        return switch (backendSeverity.trim().toUpperCase()) {
+            case "LOW" -> "INFO";
+            case "MEDIUM" -> "WARNING";
+            case "HIGH" -> "WARNING";
+            case "CRITICAL" -> "CRITICAL";
+            default -> "INFO";
+        };
+    }
+
 }

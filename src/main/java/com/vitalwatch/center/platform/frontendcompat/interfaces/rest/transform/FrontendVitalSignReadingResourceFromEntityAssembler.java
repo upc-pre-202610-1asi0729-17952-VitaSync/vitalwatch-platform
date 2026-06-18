@@ -29,7 +29,7 @@ public final class FrontendVitalSignReadingResourceFromEntityAssembler {
                 hrv,
                 fatigueLevel,
                 cortisol,
-                "ONLINE",
+                "CONNECTED",
                 entity.getSleepHoursLast24h(),
                 entity.getShiftHoursLast24h(),
                 fatigueLevel,

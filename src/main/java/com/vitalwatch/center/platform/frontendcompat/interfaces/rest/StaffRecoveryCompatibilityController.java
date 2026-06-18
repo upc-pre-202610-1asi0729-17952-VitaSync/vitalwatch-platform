@@ -465,6 +465,10 @@ public class StaffRecoveryCompatibilityController {
             RecoveryAction action,
             RecoveryPlan plan
     ) {
+        var supervisorId = action.getCompletedByUserAccountId() != null
+                ? action.getCompletedByUserAccountId()
+                : 1L;
+
         return new FrontendPreventiveActionResource(
                 action.getId(),
                 action.getRecoveryPlanId(),
@@ -472,8 +476,10 @@ public class StaffRecoveryCompatibilityController {
                 plan != null ? plan.getHospitalWorkspaceId() : null,
                 plan != null ? plan.getUserAccountId() : null,
                 plan != null ? plan.getUserAccountId() : null,
-                action.getActionType().name(),
-                action.getActionType().name(),
+                supervisorId,
+                supervisorId,
+                toFrontendPreventiveType(action.getActionType().name()),
+                toFrontendPreventiveType(action.getActionType().name()),
                 action.getNotes(),
                 action.getRecommendedRestHours(),
                 action.getCompleted(),
@@ -569,4 +575,21 @@ public class StaffRecoveryCompatibilityController {
 
         return "";
     }
+
+
+    private String toFrontendPreventiveType(String backendType) {
+        if (backendType == null || backendType.isBlank()) {
+            return "RECOVERY_BREAK";
+        }
+
+        return switch (backendType.trim().toUpperCase()) {
+            case "REST_PERIOD" -> "RECOVERY_BREAK";
+            case "SHIFT_RELEASE" -> "SHIFT_ADJUSTMENT";
+            case "MEDICAL_CHECK" -> "MEDICAL_EVALUATION";
+            case "SUPERVISOR_FOLLOW_UP" -> "SUPERVISOR_CHECK_IN";
+            case "REDUCED_WORKLOAD" -> "SHIFT_ADJUSTMENT";
+            default -> "RECOVERY_BREAK";
+        };
+    }
+
 }

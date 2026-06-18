@@ -15,6 +15,8 @@ public record FrontendPreventiveActionResource(
         Long hospitalWorkspaceId,
         Long userAccountId,
         Long userId,
+        Long supervisorId,
+        Long supervisorUserId,
         String type,
         String actionType,
         String notes,
