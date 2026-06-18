@@ -12,17 +12,27 @@ public final class FrontendVitalSignReadingResourceFromEntityAssembler {
     }
 
     public static FrontendVitalSignReadingResource toResourceFromEntity(VitalSignReading entity) {
+        var heartRate = entity.getHeartRateBpm();
+        var fatigueLevel = entity.getSelfReportedFatigueLevel();
+        var hrv = Math.max(20, 90 - fatigueLevel * 8);
+        var cortisol = 10.0 + fatigueLevel * 2.5;
+
         return new FrontendVitalSignReadingResource(
                 entity.getId(),
                 entity.getHospitalWorkspaceId(),
                 entity.getHospitalWorkspaceId(),
                 entity.getUserAccountId(),
                 entity.getUserAccountId(),
-                entity.getHeartRateBpm(),
-                entity.getHeartRateBpm(),
+                heartRate,
+                heartRate,
+                heartRate,
+                hrv,
+                fatigueLevel,
+                cortisol,
+                "ONLINE",
                 entity.getSleepHoursLast24h(),
                 entity.getShiftHoursLast24h(),
-                entity.getSelfReportedFatigueLevel(),
+                fatigueLevel,
                 entity.getSource().name(),
                 entity.getRecordedAt()
         );

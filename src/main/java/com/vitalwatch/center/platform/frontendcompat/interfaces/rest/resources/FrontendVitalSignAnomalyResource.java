@@ -17,10 +17,13 @@ public record FrontendVitalSignAnomalyResource(
         Long vitalSignReadingId,
         String type,
         String severity,
+        String status,
         String metric,
         Double value,
         Double threshold,
         String message,
-        Instant detectedAt
+        Instant detectedAt,
+        Instant reviewedAt,
+        Long reviewedBy
 ) {
 }

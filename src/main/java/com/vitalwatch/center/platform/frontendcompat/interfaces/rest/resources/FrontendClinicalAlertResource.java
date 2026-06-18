@@ -19,6 +19,9 @@ public record FrontendClinicalAlertResource(
         String severity,
         String message,
         String status,
-        Instant createdAt
+        Instant createdAt,
+        Instant occurredAt,
+        Instant resolvedAt,
+        Long resolvedBy
 ) {
 }

@@ -20,6 +20,7 @@ public record FrontendComplianceRecordResource(
         Long reviewedByUserId,
         String reviewNotes,
         Instant recordedAt,
+        Instant createdAt,
         Instant reviewedAt
 ) {
 }

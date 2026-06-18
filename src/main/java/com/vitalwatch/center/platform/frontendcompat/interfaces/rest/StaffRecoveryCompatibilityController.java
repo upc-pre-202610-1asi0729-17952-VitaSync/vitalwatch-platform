@@ -6,6 +6,7 @@ import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.C
 import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.FrontendPreventiveActionResource;
 import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.FrontendRecoveryPlanActionResource;
 import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.FrontendRecoveryPlanResource;
+import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.PatchFrontendPreventiveActionResource;
 import com.vitalwatch.center.platform.staffrecovery.domain.model.aggregates.RecoveryAction;
 import com.vitalwatch.center.platform.staffrecovery.domain.model.aggregates.RecoveryPlan;
 import com.vitalwatch.center.platform.staffrecovery.domain.model.commands.AddRecoveryActionCommand;
@@ -319,6 +320,51 @@ public class StaffRecoveryCompatibilityController {
         }
     }
 
+
+    @PatchMapping({"/preventiveActions/{preventiveActionId}", "/recoveryActions/{preventiveActionId}"})
+    @Operation(summary = "Patch frontend-compatible preventive action")
+    public ResponseEntity<FrontendPreventiveActionResource> patchPreventiveAction(
+            @PathVariable @Positive Long preventiveActionId,
+            @Valid @RequestBody PatchFrontendPreventiveActionResource resource
+    ) {
+        var action = recoveryActionRepository.findById(preventiveActionId);
+
+        if (action.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        try {
+            var actionToUpdate = action.get();
+            var status = firstNonBlank(resource.status(), "");
+            var shouldComplete = Boolean.TRUE.equals(resource.completed()) || "COMPLETED".equalsIgnoreCase(status);
+
+            if (shouldComplete && !Boolean.TRUE.equals(actionToUpdate.getCompleted())) {
+                var completedByUserId = resource.completedByUserAccountId() != null
+                        ? resource.completedByUserAccountId()
+                        : resource.userAccountId() != null
+                        ? resource.userAccountId()
+                        : resource.userId();
+
+                if (completedByUserId == null || completedByUserId <= 0) {
+                    return ResponseEntity.badRequest().build();
+                }
+
+                actionToUpdate.complete(new CompleteRecoveryActionCommand(preventiveActionId, completedByUserId));
+                var savedAction = recoveryActionRepository.save(actionToUpdate);
+                var plan = recoveryPlanRepository.findById(savedAction.getRecoveryPlanId()).orElse(null);
+
+                return ResponseEntity.ok(toPreventiveActionResource(savedAction, plan));
+            }
+
+            var plan = recoveryPlanRepository.findById(actionToUpdate.getRecoveryPlanId()).orElse(null);
+            return ResponseEntity.ok(toPreventiveActionResource(actionToUpdate, plan));
+
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().build();
+        } catch (IllegalStateException exception) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
+    }
     @PatchMapping({"/preventiveActions/{preventiveActionId}/complete", "/recoveryActions/{preventiveActionId}/complete"})
     @Operation(summary = "Complete frontend-compatible preventive action")
     public ResponseEntity<FrontendPreventiveActionResource> completePreventiveAction(

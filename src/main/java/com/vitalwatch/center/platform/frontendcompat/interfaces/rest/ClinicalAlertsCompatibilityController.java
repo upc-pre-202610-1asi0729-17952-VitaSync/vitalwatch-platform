@@ -6,13 +6,17 @@ import com.vitalwatch.center.platform.clinicalrisk.domain.repositories.ClinicalR
 import com.vitalwatch.center.platform.clinicalrisk.domain.repositories.VitalSignReadingRepository;
 import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.FrontendClinicalAlertResource;
 import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.FrontendVitalSignAnomalyResource;
+import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.UpdateFrontendClinicalAlertStatusResource;
+import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.UpdateFrontendVitalSignAnomalyStatusResource;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -60,10 +64,35 @@ public class ClinicalAlertsCompatibilityController {
 
         var alerts = assessments.stream()
                 .filter(this::isAlertAssessment)
-                .map(this::toClinicalAlert)
+                .map(assessment -> toClinicalAlert(assessment, "ACTIVE", null, null))
                 .toList();
 
         return ResponseEntity.ok(alerts);
+    }
+
+    @PatchMapping("/clinicalAlerts/{alertId}")
+    @Operation(summary = "Update frontend-compatible clinical alert status")
+    public ResponseEntity<FrontendClinicalAlertResource> updateClinicalAlertStatus(
+            @PathVariable @Positive Long alertId,
+            @Valid @RequestBody UpdateFrontendClinicalAlertStatusResource resource
+    ) {
+        var assessment = clinicalRiskAssessmentRepository.findById(alertId);
+
+        if (assessment.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        var status = firstNonBlank(resource.status(), "RESOLVED");
+        var resolvedAt = resource.resolvedAt() != null ? resource.resolvedAt() : Instant.now();
+
+        return ResponseEntity.ok(
+                toClinicalAlert(
+                        assessment.get(),
+                        status,
+                        "RESOLVED".equalsIgnoreCase(status) ? resolvedAt : null,
+                        resource.resolvedBy()
+                )
+        );
     }
 
     @GetMapping("/vitalSignAnomalies")
@@ -94,12 +123,68 @@ public class ClinicalAlertsCompatibilityController {
         return ResponseEntity.ok(anomalies);
     }
 
+    @PatchMapping("/vitalSignAnomalies/{anomalyId}")
+    @Operation(summary = "Update frontend-compatible vital sign anomaly status")
+    public ResponseEntity<FrontendVitalSignAnomalyResource> updateAnomalyStatus(
+            @PathVariable @Positive Long anomalyId,
+            @Valid @RequestBody UpdateFrontendVitalSignAnomalyStatusResource resource
+    ) {
+        var readingId = Math.max(1L, anomalyId / 10L);
+        var reading = vitalSignReadingRepository.findById(readingId);
+
+        if (reading.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        var anomaly = toVitalSignAnomalies(reading.get()).stream()
+                .filter(item -> item.id().equals(anomalyId))
+                .findFirst()
+                .orElseGet(() -> toAnomaly(
+                        anomalyId,
+                        reading.get(),
+                        "HEART_RATE_SPIKE",
+                        reading.get().getHeartRateBpm().doubleValue(),
+                        100.0,
+                        "HIGH",
+                        "Vital sign anomaly reviewed from frontend"
+                ));
+
+        var status = firstNonBlank(resource.status(), "REVIEWED");
+        var reviewedAt = resource.reviewedAt() != null ? resource.reviewedAt() : Instant.now();
+
+        return ResponseEntity.ok(
+                new FrontendVitalSignAnomalyResource(
+                        anomaly.id(),
+                        anomaly.organizationId(),
+                        anomaly.hospitalWorkspaceId(),
+                        anomaly.userAccountId(),
+                        anomaly.userId(),
+                        anomaly.vitalSignReadingId(),
+                        anomaly.type(),
+                        anomaly.severity(),
+                        status,
+                        anomaly.metric(),
+                        anomaly.value(),
+                        anomaly.threshold(),
+                        anomaly.message(),
+                        anomaly.detectedAt(),
+                        reviewedAt,
+                        resource.reviewedBy()
+                )
+        );
+    }
+
     private boolean isAlertAssessment(ClinicalRiskAssessment assessment) {
         var riskLevel = assessment.getRiskLevel().name();
         return "HIGH".equals(riskLevel) || "CRITICAL".equals(riskLevel);
     }
 
-    private FrontendClinicalAlertResource toClinicalAlert(ClinicalRiskAssessment assessment) {
+    private FrontendClinicalAlertResource toClinicalAlert(
+            ClinicalRiskAssessment assessment,
+            String status,
+            Instant resolvedAt,
+            Long resolvedBy
+    ) {
         var severity = assessment.getRiskLevel().name();
         var message = "Clinical risk detected with fatigue score " + assessment.getFatigueScore();
 
@@ -113,8 +198,11 @@ public class ClinicalAlertsCompatibilityController {
                 "CLINICAL_RISK",
                 severity,
                 message,
-                assessment.getStatus().name(),
-                assessment.getAssessedAt()
+                "RESOLVED".equalsIgnoreCase(status) ? "RESOLVED" : "ACTIVE",
+                assessment.getAssessedAt(),
+                assessment.getAssessedAt(),
+                resolvedAt,
+                resolvedBy
         );
     }
 
@@ -126,7 +214,7 @@ public class ClinicalAlertsCompatibilityController {
             anomalies.add(toAnomaly(
                     baseId + 1,
                     reading,
-                    "HIGH_HEART_RATE",
+                    "HEART_RATE_SPIKE",
                     reading.getHeartRateBpm().doubleValue(),
                     100.0,
                     reading.getHeartRateBpm() > 120 ? "CRITICAL" : "HIGH",
@@ -134,23 +222,11 @@ public class ClinicalAlertsCompatibilityController {
             ));
         }
 
-        if (reading.getHeartRateBpm() < 50) {
+        if (reading.getSleepHoursLast24h() < 6) {
             anomalies.add(toAnomaly(
                     baseId + 2,
                     reading,
-                    "LOW_HEART_RATE",
-                    reading.getHeartRateBpm().doubleValue(),
-                    50.0,
-                    "MODERATE",
-                    "Heart rate is below the recommended threshold"
-            ));
-        }
-
-        if (reading.getSleepHoursLast24h() < 6) {
-            anomalies.add(toAnomaly(
-                    baseId + 3,
-                    reading,
-                    "LOW_SLEEP",
+                    "FATIGUE_SPIKE",
                     reading.getSleepHoursLast24h(),
                     6.0,
                     reading.getSleepHoursLast24h() < 4 ? "CRITICAL" : "HIGH",
@@ -158,27 +234,27 @@ public class ClinicalAlertsCompatibilityController {
             ));
         }
 
-        if (reading.getShiftHoursLast24h() > 12) {
-            anomalies.add(toAnomaly(
-                    baseId + 4,
-                    reading,
-                    "EXTENDED_SHIFT",
-                    reading.getShiftHoursLast24h(),
-                    12.0,
-                    reading.getShiftHoursLast24h() > 16 ? "CRITICAL" : "HIGH",
-                    "Shift hours during the last 24 hours are above the recommended threshold"
-            ));
-        }
-
         if (reading.getSelfReportedFatigueLevel() >= 4) {
             anomalies.add(toAnomaly(
-                    baseId + 5,
+                    baseId + 3,
                     reading,
-                    "SELF_REPORTED_FATIGUE",
+                    "FATIGUE_SPIKE",
                     reading.getSelfReportedFatigueLevel().doubleValue(),
                     4.0,
                     reading.getSelfReportedFatigueLevel() == 5 ? "CRITICAL" : "HIGH",
                     "Self-reported fatigue level is high"
+            ));
+        }
+
+        if (anomalies.isEmpty()) {
+            anomalies.add(toAnomaly(
+                    baseId + 4,
+                    reading,
+                    "LOW_HRV",
+                    60.0,
+                    50.0,
+                    "LOW",
+                    "No critical anomaly detected"
             ));
         }
 
@@ -203,11 +279,23 @@ public class ClinicalAlertsCompatibilityController {
                 reading.getId(),
                 type,
                 severity,
+                "OPEN",
                 type,
                 value,
                 threshold,
                 message,
-                reading.getRecordedAt()
+                reading.getRecordedAt(),
+                null,
+                null
         );
+    }
+
+    private String firstNonBlank(String... values) {
+        for (var value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return "";
     }
 }

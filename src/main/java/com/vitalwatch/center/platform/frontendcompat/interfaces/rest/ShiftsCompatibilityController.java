@@ -5,6 +5,7 @@ import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.C
 import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.FrontendShiftActionResource;
 import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.FrontendShiftAssignmentResource;
 import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.FrontendShiftRecordResource;
+import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.UpdateFrontendShiftRecordStatusResource;
 import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.transform.FrontendShiftAssignmentResourceFromEntityAssembler;
 import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.transform.FrontendShiftRecordResourceFromEntityAssembler;
 import com.vitalwatch.center.platform.shifts.domain.model.aggregates.ShiftAssignment;
@@ -53,20 +54,41 @@ public class ShiftsCompatibilityController {
     @Operation(summary = "Get frontend-compatible shift records")
     public ResponseEntity<List<FrontendShiftRecordResource>> getShiftRecords(
             @RequestParam(required = false) @Positive Long organizationId,
-            @RequestParam(required = false) @Positive Long hospitalWorkspaceId
+            @RequestParam(required = false) @Positive Long hospitalWorkspaceId,
+            @RequestParam(required = false) @Positive Long userAccountId,
+            @RequestParam(required = false) @Positive Long userId
     ) {
         var workspaceId = organizationId != null ? organizationId : hospitalWorkspaceId;
+        var selectedUserId = userAccountId != null ? userAccountId : userId;
 
-        if (workspaceId == null) {
+        if (workspaceId == null && selectedUserId == null) {
             return ResponseEntity.ok(List.of());
         }
 
-        var records = workShiftRepository.findAllByHospitalWorkspaceId(workspaceId)
-                .stream()
-                .map(FrontendShiftRecordResourceFromEntityAssembler::toResourceFromEntity)
+        List<WorkShift> shifts;
+
+        if (selectedUserId != null) {
+            shifts = shiftAssignmentRepository.findAllByUserAccountId(selectedUserId)
+                    .stream()
+                    .map(assignment -> workShiftRepository.findById(assignment.getWorkShiftId()))
+                    .filter(java.util.Optional::isPresent)
+                    .map(java.util.Optional::get)
+                    .toList();
+        } else {
+            shifts = workShiftRepository.findAllByHospitalWorkspaceId(workspaceId);
+        }
+
+        var resources = shifts.stream()
+                .map(shift -> FrontendShiftRecordResourceFromEntityAssembler.toResourceFromEntity(
+                        shift,
+                        selectedUserId != null ? selectedUserId : resolveAssignedUserId(shift.getId()),
+                        null,
+                        null,
+                        null
+                ))
                 .toList();
 
-        return ResponseEntity.ok(records);
+        return ResponseEntity.ok(resources);
     }
 
     @GetMapping("/shiftRecords/{shiftRecordId}")
@@ -75,7 +97,13 @@ public class ShiftsCompatibilityController {
             @PathVariable @Positive Long shiftRecordId
     ) {
         return workShiftRepository.findById(shiftRecordId)
-                .map(FrontendShiftRecordResourceFromEntityAssembler::toResourceFromEntity)
+                .map(shift -> FrontendShiftRecordResourceFromEntityAssembler.toResourceFromEntity(
+                        shift,
+                        resolveAssignedUserId(shift.getId()),
+                        null,
+                        null,
+                        null
+                ))
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
@@ -89,6 +117,10 @@ public class ShiftsCompatibilityController {
                 ? resource.organizationId()
                 : resource.hospitalWorkspaceId();
 
+        var selectedUserId = resource.userAccountId() != null
+                ? resource.userAccountId()
+                : resource.userId();
+
         if (workspaceId == null || workspaceId <= 0) {
             return ResponseEntity.badRequest().build();
         }
@@ -100,8 +132,8 @@ public class ShiftsCompatibilityController {
             var shift = new WorkShift(
                     new CreateWorkShiftCommand(
                             workspaceId,
-                            firstNonBlank(resource.label(), resource.name(), "General Shift"),
-                            firstNonBlank(resource.workArea(), "General Care"),
+                            firstNonBlank(resource.label(), resource.name(), "Shift " + startsAt),
+                            firstNonBlank(resource.workArea(), "Work Area " + resolveWorkAreaId(resource)),
                             resolveShiftType(firstNonBlank(resource.shiftType(), resource.type(), "DAY")),
                             startsAt,
                             endsAt
@@ -109,12 +141,107 @@ public class ShiftsCompatibilityController {
             );
 
             var savedShift = workShiftRepository.save(shift);
-            var response = FrontendShiftRecordResourceFromEntityAssembler.toResourceFromEntity(savedShift);
+
+            if (selectedUserId != null && selectedUserId > 0) {
+                try {
+                    var assignment = new ShiftAssignment(
+                            new AssignUserToShiftCommand(
+                                    savedShift.getId(),
+                                    selectedUserId,
+                                    selectedUserId
+                            )
+                    );
+                    shiftAssignmentRepository.save(assignment);
+                } catch (RuntimeException ignored) {
+                }
+            }
+
+            var response = FrontendShiftRecordResourceFromEntityAssembler.toResourceFromEntity(
+                    savedShift,
+                    selectedUserId != null ? selectedUserId : 1L,
+                    null,
+                    resource.checkInAt(),
+                    resource.checkOutAt()
+            );
 
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
 
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PatchMapping("/shiftRecords/{shiftRecordId}")
+    @Operation(summary = "Patch frontend-compatible shift record")
+    public ResponseEntity<FrontendShiftRecordResource> patchShiftRecord(
+            @PathVariable @Positive Long shiftRecordId,
+            @Valid @RequestBody UpdateFrontendShiftRecordStatusResource resource
+    ) {
+        var shift = workShiftRepository.findById(shiftRecordId);
+
+        if (shift.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        var selectedUserId = resource.userAccountId() != null
+                ? resource.userAccountId()
+                : resource.userId() != null
+                ? resource.userId()
+                : resolveAssignedUserId(shiftRecordId);
+
+        var status = firstNonBlank(resource.status(), "SCHEDULED");
+
+        try {
+            var shiftToUpdate = shift.get();
+
+            if ("COMPLETED".equalsIgnoreCase(status) && !shiftToUpdate.isCompleted()) {
+                shiftToUpdate.complete(new CompleteWorkShiftCommand(shiftRecordId, selectedUserId));
+                var savedShift = workShiftRepository.save(shiftToUpdate);
+
+                return ResponseEntity.ok(
+                        FrontendShiftRecordResourceFromEntityAssembler.toResourceFromEntity(
+                                savedShift,
+                                selectedUserId,
+                                "COMPLETED",
+                                resource.checkInAt() != null ? resource.checkInAt() : savedShift.getStartsAt(),
+                                resource.checkOutAt() != null ? resource.checkOutAt() : savedShift.getCompletedAt()
+                        )
+                );
+            }
+
+            if ("CANCELLED".equalsIgnoreCase(status) && !shiftToUpdate.isCancelled()) {
+                shiftToUpdate.cancel(new CancelWorkShiftCommand(
+                        shiftRecordId,
+                        selectedUserId,
+                        "Cancelled from frontend"
+                ));
+                var savedShift = workShiftRepository.save(shiftToUpdate);
+
+                return ResponseEntity.ok(
+                        FrontendShiftRecordResourceFromEntityAssembler.toResourceFromEntity(
+                                savedShift,
+                                selectedUserId,
+                                "CANCELLED",
+                                resource.checkInAt(),
+                                resource.checkOutAt()
+                        )
+                );
+            }
+
+            return ResponseEntity.ok(
+                    FrontendShiftRecordResourceFromEntityAssembler.toResourceFromEntity(
+                            shiftToUpdate,
+                            selectedUserId,
+                            status,
+                            resource.checkInAt(),
+                            resource.checkOutAt()
+                    )
+            );
+
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().build();
+        } catch (IllegalStateException exception) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
         }
     }
 
@@ -124,25 +251,16 @@ public class ShiftsCompatibilityController {
             @PathVariable @Positive Long shiftRecordId,
             @Valid @RequestBody FrontendShiftActionResource resource
     ) {
-        var selectedUserId = resolveUserId(resource);
-
-        if (selectedUserId == null || selectedUserId <= 0) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        return workShiftRepository.findById(shiftRecordId)
-                .map(shift -> {
-                    try {
-                        shift.complete(new CompleteWorkShiftCommand(shiftRecordId, selectedUserId));
-                        var savedShift = workShiftRepository.save(shift);
-                        return ResponseEntity.ok(FrontendShiftRecordResourceFromEntityAssembler.toResourceFromEntity(savedShift));
-                    } catch (IllegalStateException exception) {
-                        return ResponseEntity.status(HttpStatus.CONFLICT).<FrontendShiftRecordResource>build();
-                    } catch (IllegalArgumentException exception) {
-                        return ResponseEntity.badRequest().<FrontendShiftRecordResource>build();
-                    }
-                })
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        return patchShiftRecord(
+                shiftRecordId,
+                new UpdateFrontendShiftRecordStatusResource(
+                        "COMPLETED",
+                        null,
+                        null,
+                        resource.userAccountId(),
+                        resource.userId()
+                )
+        );
     }
 
     @PatchMapping("/shiftRecords/{shiftRecordId}/cancel")
@@ -151,26 +269,16 @@ public class ShiftsCompatibilityController {
             @PathVariable @Positive Long shiftRecordId,
             @Valid @RequestBody FrontendShiftActionResource resource
     ) {
-        var selectedUserId = resolveUserId(resource);
-        var reason = firstNonBlank(resource.cancellationReason(), resource.reason(), "Cancelled from frontend");
-
-        if (selectedUserId == null || selectedUserId <= 0) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        return workShiftRepository.findById(shiftRecordId)
-                .map(shift -> {
-                    try {
-                        shift.cancel(new CancelWorkShiftCommand(shiftRecordId, selectedUserId, reason));
-                        var savedShift = workShiftRepository.save(shift);
-                        return ResponseEntity.ok(FrontendShiftRecordResourceFromEntityAssembler.toResourceFromEntity(savedShift));
-                    } catch (IllegalStateException exception) {
-                        return ResponseEntity.status(HttpStatus.CONFLICT).<FrontendShiftRecordResource>build();
-                    } catch (IllegalArgumentException exception) {
-                        return ResponseEntity.badRequest().<FrontendShiftRecordResource>build();
-                    }
-                })
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        return patchShiftRecord(
+                shiftRecordId,
+                new UpdateFrontendShiftRecordStatusResource(
+                        "CANCELLED",
+                        null,
+                        null,
+                        resource.userAccountId(),
+                        resource.userId()
+                )
+        );
     }
 
     @GetMapping("/shiftAssignments")
@@ -228,18 +336,8 @@ public class ShiftsCompatibilityController {
             return ResponseEntity.badRequest().build();
         }
 
-        var shift = workShiftRepository.findById(selectedShiftId);
-
-        if (shift.isEmpty()) {
+        if (workShiftRepository.findById(selectedShiftId).isEmpty()) {
             return ResponseEntity.notFound().build();
-        }
-
-        if (shift.get().isCancelled() || shift.get().isCompleted()) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).build();
-        }
-
-        if (shiftAssignmentRepository.existsActiveAssignmentByUserAccountId(selectedUserId)) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).build();
         }
 
         try {
@@ -267,7 +365,7 @@ public class ShiftsCompatibilityController {
             @PathVariable @Positive Long shiftAssignmentId,
             @Valid @RequestBody FrontendShiftActionResource resource
     ) {
-        var selectedUserId = resolveUserId(resource);
+        var selectedUserId = resource.userAccountId() != null ? resource.userAccountId() : resource.userId();
 
         if (selectedUserId == null || selectedUserId <= 0) {
             return ResponseEntity.badRequest().build();
@@ -281,8 +379,6 @@ public class ShiftsCompatibilityController {
                         return ResponseEntity.ok(FrontendShiftAssignmentResourceFromEntityAssembler.toResourceFromEntity(savedAssignment));
                     } catch (IllegalStateException exception) {
                         return ResponseEntity.status(HttpStatus.CONFLICT).<FrontendShiftAssignmentResource>build();
-                    } catch (IllegalArgumentException exception) {
-                        return ResponseEntity.badRequest().<FrontendShiftAssignmentResource>build();
                     }
                 })
                 .orElseGet(() -> ResponseEntity.notFound().build());
@@ -294,8 +390,7 @@ public class ShiftsCompatibilityController {
             @PathVariable @Positive Long shiftAssignmentId,
             @Valid @RequestBody FrontendShiftActionResource resource
     ) {
-        var selectedUserId = resolveUserId(resource);
-        var reason = firstNonBlank(resource.releaseReason(), resource.reason(), "Released from frontend");
+        var selectedUserId = resource.userAccountId() != null ? resource.userAccountId() : resource.userId();
 
         if (selectedUserId == null || selectedUserId <= 0) {
             return ResponseEntity.badRequest().build();
@@ -304,39 +399,43 @@ public class ShiftsCompatibilityController {
         return shiftAssignmentRepository.findById(shiftAssignmentId)
                 .map(assignment -> {
                     try {
-                        assignment.release(new ReleaseShiftAssignmentCommand(shiftAssignmentId, selectedUserId, reason));
+                        assignment.release(new ReleaseShiftAssignmentCommand(
+                                shiftAssignmentId,
+                                selectedUserId,
+                                firstNonBlank(resource.releaseReason(), resource.reason(), "Released from frontend")
+                        ));
                         var savedAssignment = shiftAssignmentRepository.save(assignment);
                         return ResponseEntity.ok(FrontendShiftAssignmentResourceFromEntityAssembler.toResourceFromEntity(savedAssignment));
                     } catch (IllegalStateException exception) {
                         return ResponseEntity.status(HttpStatus.CONFLICT).<FrontendShiftAssignmentResource>build();
-                    } catch (IllegalArgumentException exception) {
-                        return ResponseEntity.badRequest().<FrontendShiftAssignmentResource>build();
                     }
                 })
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    private String firstNonBlank(String... values) {
-        for (var value : values) {
-            if (value != null && !value.isBlank()) {
-                return value.trim();
-            }
-        }
-        return "";
+    private Long resolveAssignedUserId(Long shiftId) {
+        return shiftAssignmentRepository.findAllByWorkShiftId(shiftId)
+                .stream()
+                .findFirst()
+                .map(ShiftAssignment::getUserAccountId)
+                .orElse(1L);
+    }
+
+    private Long resolveWorkAreaId(CreateFrontendShiftRecordResource resource) {
+        return resource.workAreaId() != null ? resource.workAreaId() : 1L;
     }
 
     private Instant resolveStartTime(CreateFrontendShiftRecordResource resource) {
-        if (resource.startsAt() != null) {
-            return resource.startsAt();
-        }
-        if (resource.startTime() != null) {
-            return resource.startTime();
-        }
+        if (resource.scheduledStart() != null) return resource.scheduledStart();
+        if (resource.startsAt() != null) return resource.startsAt();
+        if (resource.startTime() != null) return resource.startTime();
         return Instant.now();
     }
 
     private Instant resolveEndTime(CreateFrontendShiftRecordResource resource, Instant startsAt) {
-        var candidate = resource.endsAt() != null
+        var candidate = resource.scheduledEnd() != null
+                ? resource.scheduledEnd()
+                : resource.endsAt() != null
                 ? resource.endsAt()
                 : resource.endTime();
 
@@ -359,10 +458,12 @@ public class ShiftsCompatibilityController {
         }
     }
 
-    private Long resolveUserId(FrontendShiftActionResource resource) {
-        if (resource.userAccountId() != null) {
-            return resource.userAccountId();
+    private String firstNonBlank(String... values) {
+        for (var value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
         }
-        return resource.userId();
+        return "";
     }
 }

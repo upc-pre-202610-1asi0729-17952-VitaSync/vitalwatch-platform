@@ -52,10 +52,15 @@ public class AuditCompatibilityController {
             @RequestParam(required = false) @Positive Long organizationId,
             @RequestParam(required = false) @Positive Long hospitalWorkspaceId,
             @RequestParam(required = false) @Positive Long actorUserAccountId,
+            @RequestParam(required = false) @Positive Long actorUserId,
             @RequestParam(required = false) @Positive Long userId
     ) {
         var workspaceId = organizationId != null ? organizationId : hospitalWorkspaceId;
-        var actorId = actorUserAccountId != null ? actorUserAccountId : userId;
+        var actorId = actorUserAccountId != null
+                ? actorUserAccountId
+                : actorUserId != null
+                ? actorUserId
+                : userId;
 
         List<AuditLog> logs;
 
@@ -236,12 +241,15 @@ public class AuditCompatibilityController {
                 entity.getHospitalWorkspaceId(),
                 entity.getActorUserAccountId(),
                 entity.getActorUserAccountId(),
+                entity.getActorUserAccountId(),
+                entity.getActionType().name(),
                 entity.getActionType().name(),
                 entity.getResourceType().name(),
                 entity.getResourceId(),
                 entity.getSeverity().name(),
                 entity.getDescription(),
                 entity.getIpAddress(),
+                entity.getOccurredAt(),
                 entity.getOccurredAt()
         );
     }
@@ -259,15 +267,13 @@ public class AuditCompatibilityController {
                 entity.getReviewedByUserAccountId(),
                 entity.getReviewNotes(),
                 entity.getRecordedAt(),
+                entity.getRecordedAt(),
                 entity.getReviewedAt()
         );
     }
 
     private AuditActionType resolveActionType(String value) {
-        if (value == null || value.isBlank()) {
-            return AuditActionType.UPDATE;
-        }
-
+        if (value == null || value.isBlank()) return AuditActionType.UPDATE;
         try {
             return AuditActionType.valueOf(value.trim().toUpperCase().replace("-", "_"));
         } catch (IllegalArgumentException exception) {
@@ -276,10 +282,7 @@ public class AuditCompatibilityController {
     }
 
     private AuditResourceType resolveResourceType(String value) {
-        if (value == null || value.isBlank()) {
-            return AuditResourceType.PROFILE;
-        }
-
+        if (value == null || value.isBlank()) return AuditResourceType.PROFILE;
         try {
             return AuditResourceType.valueOf(value.trim().toUpperCase().replace("-", "_"));
         } catch (IllegalArgumentException exception) {
@@ -288,10 +291,7 @@ public class AuditCompatibilityController {
     }
 
     private AuditSeverity resolveSeverity(String value) {
-        if (value == null || value.isBlank()) {
-            return AuditSeverity.MEDIUM;
-        }
-
+        if (value == null || value.isBlank()) return AuditSeverity.MEDIUM;
         try {
             return AuditSeverity.valueOf(value.trim().toUpperCase().replace("-", "_"));
         } catch (IllegalArgumentException exception) {
@@ -300,9 +300,7 @@ public class AuditCompatibilityController {
     }
 
     private ComplianceStatus resolveComplianceStatus(String value) {
-        if (value == null || value.isBlank()) {
-            return ComplianceStatus.PENDING_REVIEW;
-        }
+        if (value == null || value.isBlank()) return ComplianceStatus.PENDING_REVIEW;
 
         var normalized = value.trim().toUpperCase().replace("-", "_");
 
@@ -318,18 +316,9 @@ public class AuditCompatibilityController {
     }
 
     private Long resolveReviewerId(ReviewFrontendComplianceRecordResource resource) {
-        if (resource.reviewedByUserAccountId() != null) {
-            return resource.reviewedByUserAccountId();
-        }
-
-        if (resource.reviewedByUserId() != null) {
-            return resource.reviewedByUserId();
-        }
-
-        if (resource.userAccountId() != null) {
-            return resource.userAccountId();
-        }
-
+        if (resource.reviewedByUserAccountId() != null) return resource.reviewedByUserAccountId();
+        if (resource.reviewedByUserId() != null) return resource.reviewedByUserId();
+        if (resource.userAccountId() != null) return resource.userAccountId();
         return resource.userId();
     }
 

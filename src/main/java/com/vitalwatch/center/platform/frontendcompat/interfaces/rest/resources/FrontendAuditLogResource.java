@@ -13,13 +13,16 @@ public record FrontendAuditLogResource(
         Long organizationId,
         Long hospitalWorkspaceId,
         Long actorUserAccountId,
+        Long actorUserId,
         Long userId,
         String actionType,
+        String type,
         String resourceType,
         Long resourceId,
         String severity,
         String description,
         String ipAddress,
-        Instant occurredAt
+        Instant occurredAt,
+        Instant createdAt
 ) {
 }
