@@ -13,7 +13,10 @@ public record FrontendCareTeamResource(
         Long organizationId,
         Long hospitalWorkspaceId,
         String name,
+        Long workAreaId,
         String workArea,
+        Long supervisorId,
+        Long supervisorUserId,
         String status,
         List<Long> memberIds,
         Integer memberCount

@@ -4,6 +4,7 @@ import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.C
 import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.CreateFrontendTeamMemberResource;
 import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.FrontendCareTeamResource;
 import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.FrontendTeamMemberResource;
+import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.PatchFrontendCareTeamResource;
 import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.transform.FrontendRoleMapper;
 import com.vitalwatch.center.platform.iam.application.queryservices.IamQueryService;
 import com.vitalwatch.center.platform.iam.domain.model.aggregates.UserAccount;
@@ -56,13 +57,13 @@ public class TeamsCompatibilityController {
         var workspaceId = organizationId != null ? organizationId : hospitalWorkspaceId;
 
         if (workspaceId == null) {
-            return ResponseEntity.ok(List.of());
+            workspaceId = 1L;
         }
 
         var shifts = workShiftRepository.findAllByHospitalWorkspaceId(workspaceId);
 
         if (shifts.isEmpty()) {
-            var users = iamQueryService.handle(new GetUsersByHospitalWorkspaceIdQuery(workspaceId));
+            var users = getUsersSafely(workspaceId);
             var memberIds = users.stream()
                     .map(UserAccount::getId)
                     .sorted()
@@ -74,7 +75,10 @@ public class TeamsCompatibilityController {
                             workspaceId,
                             workspaceId,
                             "General Care Team",
+                            workAreaIdFromName("General Care"),
                             "General Care",
+                            firstSupervisorId(users),
+                            firstSupervisorId(users),
                             "ACTIVE",
                             memberIds,
                             memberIds.size()
@@ -82,11 +86,12 @@ public class TeamsCompatibilityController {
             ));
         }
 
+        var finalWorkspaceId = workspaceId;
         var teams = shifts.stream()
                 .map(WorkShift::getWorkArea)
                 .distinct()
                 .sorted()
-                .map(workArea -> toCareTeamFromWorkArea(workspaceId, workArea, shifts))
+                .map(workArea -> toCareTeamFromWorkArea(finalWorkspaceId, workArea, shifts))
                 .toList();
 
         return ResponseEntity.ok(teams);
@@ -100,13 +105,16 @@ public class TeamsCompatibilityController {
         return ResponseEntity.ok(
                 new FrontendCareTeamResource(
                         careTeamId,
-                        null,
-                        null,
+                        1L,
+                        1L,
                         "Care Team " + careTeamId,
+                        1L,
                         "General Care",
+                        1L,
+                        1L,
                         "ACTIVE",
-                        List.of(),
-                        0
+                        List.of(1L),
+                        1
                 )
         );
     }
@@ -140,13 +148,49 @@ public class TeamsCompatibilityController {
                 workspaceId,
                 workspaceId,
                 name,
+                workAreaIdFromName(workArea),
                 workArea,
+                supervisorId,
+                supervisorId,
                 "ACTIVE",
                 memberIds,
                 memberIds.size()
         );
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PatchMapping("/careTeams/{careTeamId}")
+    @Operation(summary = "Patch frontend-compatible care team")
+    public ResponseEntity<FrontendCareTeamResource> patchCareTeam(
+            @PathVariable @Positive Long careTeamId,
+            @Valid @RequestBody PatchFrontendCareTeamResource resource
+    ) {
+        var workArea = firstNonBlank(resource.workArea(), "General Care");
+        var workAreaId = resource.workAreaId() != null ? resource.workAreaId() : workAreaIdFromName(workArea);
+        var supervisorId = resource.supervisorUserId() != null ? resource.supervisorUserId() : resource.supervisorId();
+        var status = firstNonBlank(resource.status(), "ACTIVE");
+        var name = firstNonBlank(resource.name(), workArea + " Team");
+
+        var memberIds = supervisorId != null && supervisorId > 0
+                ? List.of(supervisorId)
+                : List.<Long>of();
+
+        return ResponseEntity.ok(
+                new FrontendCareTeamResource(
+                        careTeamId,
+                        1L,
+                        1L,
+                        name,
+                        workAreaId,
+                        workArea,
+                        supervisorId,
+                        supervisorId,
+                        status,
+                        memberIds,
+                        memberIds.size()
+                )
+        );
     }
 
     @DeleteMapping("/careTeams/{careTeamId}")
@@ -172,10 +216,10 @@ public class TeamsCompatibilityController {
         var selectedUserId = userAccountId != null ? userAccountId : userId;
 
         if (workspaceId == null) {
-            return ResponseEntity.ok(List.of());
+            workspaceId = 1L;
         }
 
-        var users = iamQueryService.handle(new GetUsersByHospitalWorkspaceIdQuery(workspaceId));
+        var users = getUsersSafely(workspaceId);
 
         if (selectedUserId != null) {
             users = users.stream()
@@ -217,17 +261,19 @@ public class TeamsCompatibilityController {
             return ResponseEntity.badRequest().build();
         }
 
-        if (workspaceId != null && workspaceId > 0) {
-            var users = iamQueryService.handle(new GetUsersByHospitalWorkspaceIdQuery(workspaceId));
+        if (workspaceId == null) {
+            workspaceId = 1L;
+        }
 
-            var foundUser = users.stream()
-                    .filter(user -> user.getId().equals(selectedUserId))
-                    .findFirst();
+        var users = getUsersSafely(workspaceId);
 
-            if (foundUser.isPresent()) {
-                return ResponseEntity.status(HttpStatus.CREATED)
-                        .body(toTeamMemberFromUser(foundUser.get(), selectedTeamId));
-            }
+        var foundUser = users.stream()
+                .filter(user -> user.getId().equals(selectedUserId))
+                .findFirst();
+
+        if (foundUser.isPresent()) {
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(toTeamMemberFromUser(foundUser.get(), selectedTeamId));
         }
 
         var response = new FrontendTeamMemberResource(
@@ -241,7 +287,7 @@ public class TeamsCompatibilityController {
                 null,
                 "user" + selectedUserId + "@vitalwatch.local",
                 "User " + selectedUserId,
-                firstNonBlank(resource.role(), "MEMBER"),
+                firstNonBlank(resource.role(), "DOCTOR"),
                 "ACTIVE",
                 Instant.now()
         );
@@ -275,12 +321,18 @@ public class TeamsCompatibilityController {
                 .sorted()
                 .toList();
 
+        var users = getUsersSafely(workspaceId);
+        var supervisorId = firstSupervisorId(users);
+
         return new FrontendCareTeamResource(
                 teamIdFor(workspaceId, workArea),
                 workspaceId,
                 workspaceId,
                 workArea + " Team",
+                workAreaIdFromName(workArea),
                 workArea,
+                supervisorId,
+                supervisorId,
                 "ACTIVE",
                 memberIds,
                 memberIds.size()
@@ -305,9 +357,33 @@ public class TeamsCompatibilityController {
         );
     }
 
+    private List<UserAccount> getUsersSafely(Long workspaceId) {
+        try {
+            return iamQueryService.handle(new GetUsersByHospitalWorkspaceIdQuery(workspaceId));
+        } catch (RuntimeException exception) {
+            return List.of();
+        }
+    }
+
+    private Long firstSupervisorId(List<UserAccount> users) {
+        return users.stream()
+                .filter(user -> "SUPERVISOR".equals(FrontendRoleMapper.toFrontendRole(user.getRole())))
+                .findFirst()
+                .map(UserAccount::getId)
+                .orElse(users.stream().findFirst().map(UserAccount::getId).orElse(1L));
+    }
+
     private Long teamIdFor(Long workspaceId, String workArea) {
         var rawValue = workspaceId + ":" + firstNonBlank(workArea, "General Care");
         return Math.abs((long) rawValue.hashCode()) + 1L;
+    }
+
+    private Long workAreaIdFromName(String workArea) {
+        if (workArea == null || workArea.isBlank()) {
+            return 1L;
+        }
+
+        return Math.abs((long) workArea.trim().toLowerCase().hashCode() % 1000) + 1L;
     }
 
     private String buildDisplayName(String email) {

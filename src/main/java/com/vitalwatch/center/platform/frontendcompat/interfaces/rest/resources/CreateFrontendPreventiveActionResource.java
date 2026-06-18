@@ -8,6 +8,12 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @Schema(name = "CreateFrontendPreventiveActionRequest", description = "Preventive action creation request compatible with the Angular frontend")
 public record CreateFrontendPreventiveActionResource(
         Long recoveryPlanId,
+        Long organizationId,
+        Long hospitalWorkspaceId,
+        Long supervisorId,
+        Long supervisorUserId,
+        Long userAccountId,
+        Long userId,
         String type,
         String actionType,
         String notes,

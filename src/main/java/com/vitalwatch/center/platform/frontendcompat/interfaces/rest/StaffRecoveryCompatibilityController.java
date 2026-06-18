@@ -292,20 +292,53 @@ public class StaffRecoveryCompatibilityController {
     public ResponseEntity<FrontendPreventiveActionResource> createPreventiveAction(
             @Valid @RequestBody CreateFrontendPreventiveActionResource resource
     ) {
-        if (resource.recoveryPlanId() == null || resource.recoveryPlanId() <= 0) {
-            return ResponseEntity.badRequest().build();
-        }
+        Long recoveryPlanId = resource.recoveryPlanId();
+        RecoveryPlan plan = null;
 
-        var plan = recoveryPlanRepository.findById(resource.recoveryPlanId());
+        if (recoveryPlanId != null && recoveryPlanId > 0) {
+            var existingPlan = recoveryPlanRepository.findById(recoveryPlanId);
 
-        if (plan.isEmpty()) {
-            return ResponseEntity.notFound().build();
+            if (existingPlan.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+
+            plan = existingPlan.get();
+
+        } else {
+            var workspaceId = resource.organizationId() != null
+                    ? resource.organizationId()
+                    : resource.hospitalWorkspaceId();
+
+            var selectedUserId = resource.userAccountId() != null
+                    ? resource.userAccountId()
+                    : resource.userId();
+
+            if (workspaceId == null || workspaceId <= 0 ||
+                    selectedUserId == null || selectedUserId <= 0) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            var newPlan = new RecoveryPlan(
+                    new CreateRecoveryPlanCommand(
+                            workspaceId,
+                            selectedUserId,
+                            null,
+                            null,
+                            RecoveryPlanReason.FATIGUE_RISK,
+                            RecoveryPriority.HIGH,
+                            resolveRestHours(resource.recommendedRestHours()),
+                            firstNonBlank(resource.notes(), "Preventive action generated from frontend.")
+                    )
+            );
+
+            plan = recoveryPlanRepository.save(newPlan);
+            recoveryPlanId = plan.getId();
         }
 
         try {
             var action = new RecoveryAction(
                     new AddRecoveryActionCommand(
-                            resource.recoveryPlanId(),
+                            recoveryPlanId,
                             resolveActionType(firstNonBlank(resource.actionType(), resource.type(), "REST_PERIOD")),
                             firstNonBlank(resource.notes(), "Preventive recovery action recommended."),
                             resolveRestHours(resource.recommendedRestHours())
@@ -313,13 +346,12 @@ public class StaffRecoveryCompatibilityController {
             );
 
             var savedAction = recoveryActionRepository.save(action);
-            return ResponseEntity.status(HttpStatus.CREATED).body(toPreventiveActionResource(savedAction, plan.get()));
+            return ResponseEntity.status(HttpStatus.CREATED).body(toPreventiveActionResource(savedAction, plan));
 
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.badRequest().build();
         }
     }
-
 
     @PatchMapping({"/preventiveActions/{preventiveActionId}", "/recoveryActions/{preventiveActionId}"})
     @Operation(summary = "Patch frontend-compatible preventive action")
