@@ -2,6 +2,7 @@ package com.vitalwatch.center.platform.frontendcompat.interfaces.rest;
 
 import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.CreateFrontendSubscriptionResource;
 import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.FrontendSubscriptionResource;
+import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.resources.PatchFrontendSubscriptionResource;
 import com.vitalwatch.center.platform.frontendcompat.interfaces.rest.transform.FrontendSubscriptionResourceFromEntityAssembler;
 import com.vitalwatch.center.platform.iam.domain.repositories.HospitalWorkspaceRepository;
 import com.vitalwatch.center.platform.subscriptions.domain.model.aggregates.HospitalSubscription;
@@ -54,13 +55,15 @@ public class SubscriptionsCompatibilityController {
 
     @GetMapping(params = "organizationId")
     @Operation(summary = "Get frontend-compatible subscription by organization id")
-    public ResponseEntity<FrontendSubscriptionResource> getSubscriptionByOrganizationId(
+    public ResponseEntity<List<FrontendSubscriptionResource>> getSubscriptionByOrganizationId(
             @RequestParam @Positive Long organizationId
     ) {
-        return hospitalSubscriptionRepository.findByHospitalWorkspaceId(organizationId)
+        var resources = hospitalSubscriptionRepository.findByHospitalWorkspaceId(organizationId)
+                .stream()
                 .map(FrontendSubscriptionResourceFromEntityAssembler::toResourceFromEntity)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+                .toList();
+
+        return ResponseEntity.ok(resources);
     }
 
     @GetMapping("/{subscriptionId}")
@@ -109,5 +112,49 @@ public class SubscriptionsCompatibilityController {
         var response = FrontendSubscriptionResourceFromEntityAssembler.toResourceFromEntity(savedSubscription);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PatchMapping("/{subscriptionId}")
+    @Operation(summary = "Patch frontend-compatible subscription")
+    public ResponseEntity<FrontendSubscriptionResource> patchSubscription(
+            @PathVariable @Positive Long subscriptionId,
+            @Valid @RequestBody PatchFrontendSubscriptionResource resource
+    ) {
+        var subscription = hospitalSubscriptionRepository.findById(subscriptionId);
+
+        if (subscription.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        var selectedPlanId = resource.planId() != null
+                ? resource.planId()
+                : resource.subscriptionPlanId();
+
+        try {
+            var subscriptionToUpdate = subscription.get();
+
+            if (selectedPlanId != null) {
+                var plan = subscriptionPlanRepository.findById(selectedPlanId);
+
+                if (plan.isEmpty()) {
+                    return ResponseEntity.notFound().build();
+                }
+
+                subscriptionToUpdate.changePlan(selectedPlanId);
+            }
+
+            if ("CANCELLED".equalsIgnoreCase(resource.status())) {
+                subscriptionToUpdate.cancel();
+            }
+
+            var savedSubscription = hospitalSubscriptionRepository.save(subscriptionToUpdate);
+
+            return ResponseEntity.ok(FrontendSubscriptionResourceFromEntityAssembler.toResourceFromEntity(savedSubscription));
+
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().build();
+        } catch (IllegalStateException exception) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).build();
+        }
     }
 }
