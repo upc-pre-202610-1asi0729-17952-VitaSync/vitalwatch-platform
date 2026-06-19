@@ -27,6 +27,9 @@ public class OpenApiConfiguration {
     @Value("${documentation.application.version}")
     String applicationVersion;
 
+    @Value("${documentation.server.url}")
+    String serverUrl;
+
     @Bean
     public OpenAPI vitalWatchOpenApi() {
         var openApi = new OpenAPI();
@@ -48,8 +51,8 @@ public class OpenApiConfiguration {
 
         openApi.servers(List.of(
                 new Server()
-                        .url("http://localhost:8080")
-                        .description("Local Development Environment")
+                        .url(this.serverUrl)
+                        .description("Application Server")
         ));
 
         return openApi;
