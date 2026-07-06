@@ -54,6 +54,8 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/authentication/sign-up").permitAll()
                         .requestMatchers(HttpMethod.GET, "/authentication/me").authenticated()
 
+                        .requestMatchers(HttpMethod.GET, "/plans/**").permitAll()
+
                         /*
                          * Temporarily public while the registration, checkout,
                          * and invitation flows are completed.
