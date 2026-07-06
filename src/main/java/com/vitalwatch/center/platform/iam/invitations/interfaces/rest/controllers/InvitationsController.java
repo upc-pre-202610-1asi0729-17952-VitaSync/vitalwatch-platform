@@ -1,5 +1,6 @@
 package com.vitalwatch.center.platform.iam.invitations.interfaces.rest.controllers;
 
+import com.vitalwatch.center.platform.iam.invitations.application.internal.outboundservices.InvitationEmailService;
 import com.vitalwatch.center.platform.iam.infrastructure.persistence.jpa.entities.UserJpaEntity;
 import com.vitalwatch.center.platform.iam.infrastructure.persistence.jpa.repositories.OrganizationJpaRepository;
 import com.vitalwatch.center.platform.iam.infrastructure.persistence.jpa.repositories.UserJpaRepository;
@@ -41,6 +42,7 @@ public class InvitationsController {
     private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
     private final MessageResolver messageResolver;
+    private final InvitationEmailService invitationEmailService;
 
     public InvitationsController(
             InvitationJpaRepository invitationRepository,
@@ -48,6 +50,7 @@ public class InvitationsController {
             UserJpaRepository userRepository,
             PasswordEncoder passwordEncoder,
             TokenService tokenService,
+            InvitationEmailService invitationEmailService,
             MessageResolver messageResolver
     ) {
         this.invitationRepository = invitationRepository;
@@ -55,6 +58,7 @@ public class InvitationsController {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
+        this.invitationEmailService = invitationEmailService;
         this.messageResolver = messageResolver;
     }
 
@@ -179,6 +183,8 @@ public class InvitationsController {
         );
 
         var savedInvitation = invitationRepository.save(invitation);
+
+        invitationEmailService.sendInvitation(savedInvitation);
 
         var invitationResource = InvitationResourceFromEntityAssembler.toResourceFromEntity(
                 savedInvitation
