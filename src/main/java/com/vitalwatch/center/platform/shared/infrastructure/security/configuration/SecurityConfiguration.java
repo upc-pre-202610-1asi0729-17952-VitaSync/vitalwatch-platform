@@ -87,6 +87,9 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/invitations/send")
                         .hasRole("HOSPITAL_ADMIN")
 
+                        .requestMatchers(HttpMethod.GET, "/specialties/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/workAreas/**").permitAll()
+
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
