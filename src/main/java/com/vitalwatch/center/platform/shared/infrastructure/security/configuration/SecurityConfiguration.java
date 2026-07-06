@@ -51,6 +51,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                         .requestMatchers(HttpMethod.POST, "/authentication/sign-in").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/authentication/me").authenticated()
 
                         /*
                          * Temporarily public while the registration, checkout,
