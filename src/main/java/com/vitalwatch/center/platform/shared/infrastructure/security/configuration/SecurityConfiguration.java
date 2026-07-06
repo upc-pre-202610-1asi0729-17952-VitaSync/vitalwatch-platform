@@ -69,6 +69,12 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/users/**")
                         .hasAnyRole("HOSPITAL_ADMIN", "SUPERVISOR")
 
+                        .requestMatchers(HttpMethod.GET, "/subscriptions/**")
+                        .hasRole("HOSPITAL_ADMIN")
+
+                        .requestMatchers(HttpMethod.POST, "/subscriptions")
+                        .hasRole("HOSPITAL_ADMIN")
+
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
