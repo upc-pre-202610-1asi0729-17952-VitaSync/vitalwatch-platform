@@ -90,6 +90,9 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/specialties/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/workAreas/**").permitAll()
 
+                        .requestMatchers(HttpMethod.POST, "/clinicalSimulation/**")
+                        .hasAnyRole("HOSPITAL_ADMIN", "SUPERVISOR")
+
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
