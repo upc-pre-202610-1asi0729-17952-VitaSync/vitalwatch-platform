@@ -48,15 +48,22 @@ public class SecurityConfiguration {
                                 "/v3/api-docs/**"
                         ).permitAll()
 
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
                         .requestMatchers(HttpMethod.POST, "/authentication/sign-in").permitAll()
 
                         /*
-                         * Temporalmente quedan libres para poder crear datos de prueba.
-                         * Luego, cuando tengamos sign-up/checkout/invitations,
-                         * ajustamos estas reglas.
+                         * Temporarily public while the registration, checkout,
+                         * and invitation flows are completed.
                          */
                         .requestMatchers(HttpMethod.POST, "/organizations").permitAll()
                         .requestMatchers(HttpMethod.POST, "/users").permitAll()
+
+                        .requestMatchers(HttpMethod.GET, "/organizations/**")
+                        .hasRole("HOSPITAL_ADMIN")
+
+                        .requestMatchers(HttpMethod.GET, "/users/**")
+                        .hasAnyRole("HOSPITAL_ADMIN", "SUPERVISOR")
 
                         .anyRequest().authenticated()
                 )
