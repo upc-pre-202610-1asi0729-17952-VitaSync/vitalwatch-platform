@@ -1,5 +1,6 @@
 package com.vitalwatch.center.platform.shared.interfaces.rest;
 
+import com.vitalwatch.center.platform.shared.application.i18n.MessageResolver;
 import com.vitalwatch.center.platform.shared.interfaces.rest.transform.ErrorResponseAssembler;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
@@ -16,6 +17,12 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private final MessageResolver messageResolver;
+
+    public GlobalExceptionHandler(MessageResolver messageResolver) {
+        this.messageResolver = messageResolver;
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public Object handleMethodArgumentNotValid(MethodArgumentNotValidException exception) {
         var details = exception.getBindingResult()
@@ -26,7 +33,7 @@ public class GlobalExceptionHandler {
 
         return ErrorResponseAssembler.toResponseEntity(
                 "VALIDATION_ERROR",
-                "Validation failed.",
+                messageResolver.get("error.validation"),
                 details,
                 HttpStatus.BAD_REQUEST
         );
@@ -41,7 +48,7 @@ public class GlobalExceptionHandler {
 
         return ErrorResponseAssembler.toResponseEntity(
                 "VALIDATION_ERROR",
-                "Validation failed.",
+                messageResolver.get("error.validation"),
                 details,
                 HttpStatus.BAD_REQUEST
         );
@@ -51,7 +58,7 @@ public class GlobalExceptionHandler {
     public Object handleHttpMessageNotReadable(HttpMessageNotReadableException exception) {
         return ErrorResponseAssembler.toResponseEntity(
                 "INVALID_REQUEST_BODY",
-                "The request body is invalid or malformed.",
+                messageResolver.get("error.invalidRequestBody"),
                 exception.getMostSpecificCause().getMessage(),
                 HttpStatus.BAD_REQUEST
         );
@@ -71,7 +78,7 @@ public class GlobalExceptionHandler {
     public Object handleUnexpected(Exception exception) {
         return ErrorResponseAssembler.toResponseEntity(
                 "UNEXPECTED_ERROR",
-                "An unexpected error occurred.",
+                messageResolver.get("error.unexpected"),
                 exception.getMessage(),
                 HttpStatus.INTERNAL_SERVER_ERROR
         );

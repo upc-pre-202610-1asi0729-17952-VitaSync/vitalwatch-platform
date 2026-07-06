@@ -4,6 +4,7 @@ import com.vitalwatch.center.platform.iam.application.internal.outboundservices.
 import com.vitalwatch.center.platform.iam.infrastructure.persistence.jpa.repositories.UserJpaRepository;
 import com.vitalwatch.center.platform.iam.interfaces.rest.resources.SignInResource;
 import com.vitalwatch.center.platform.iam.interfaces.rest.transform.AuthenticatedUserResourceFromEntityAssembler;
+import com.vitalwatch.center.platform.shared.application.i18n.MessageResolver;
 import com.vitalwatch.center.platform.shared.application.result.ApplicationError;
 import com.vitalwatch.center.platform.shared.interfaces.rest.transform.ErrorResponseAssembler;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,15 +25,18 @@ public class AuthenticationController {
     private final UserJpaRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
+    private final MessageResolver messageResolver;
 
     public AuthenticationController(
             UserJpaRepository userRepository,
             PasswordEncoder passwordEncoder,
-            TokenService tokenService
+            TokenService tokenService,
+            MessageResolver messageResolver
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
+        this.messageResolver = messageResolver;
     }
 
     @PostMapping("/sign-in")
@@ -44,7 +48,9 @@ public class AuthenticationController {
 
         if (user.isEmpty()) {
             return ErrorResponseAssembler.toResponseEntity(
-                    ApplicationError.validation("Invalid email or password.")
+                    ApplicationError.validation(
+                            messageResolver.get("iam.authentication.invalidCredentials")
+                    )
             );
         }
 
@@ -52,7 +58,9 @@ public class AuthenticationController {
 
         if (!passwordEncoder.matches(resource.password(), authenticatedUser.getPasswordHash())) {
             return ErrorResponseAssembler.toResponseEntity(
-                    ApplicationError.validation("Invalid email or password.")
+                    ApplicationError.validation(
+                            messageResolver.get("iam.authentication.invalidCredentials")
+                    )
             );
         }
 

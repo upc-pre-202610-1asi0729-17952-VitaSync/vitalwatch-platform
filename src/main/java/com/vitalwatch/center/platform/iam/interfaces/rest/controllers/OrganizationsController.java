@@ -5,6 +5,7 @@ import com.vitalwatch.center.platform.iam.infrastructure.persistence.jpa.reposit
 import com.vitalwatch.center.platform.iam.interfaces.rest.resources.CreateOrganizationResource;
 import com.vitalwatch.center.platform.iam.interfaces.rest.resources.OrganizationResource;
 import com.vitalwatch.center.platform.iam.interfaces.rest.transform.OrganizationResourceFromEntityAssembler;
+import com.vitalwatch.center.platform.shared.application.i18n.MessageResolver;
 import com.vitalwatch.center.platform.shared.application.result.ApplicationError;
 import com.vitalwatch.center.platform.shared.interfaces.rest.transform.ErrorResponseAssembler;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,9 +26,14 @@ import java.util.List;
 public class OrganizationsController {
 
     private final OrganizationJpaRepository organizationRepository;
+    private final MessageResolver messageResolver;
 
-    public OrganizationsController(OrganizationJpaRepository organizationRepository) {
+    public OrganizationsController(
+            OrganizationJpaRepository organizationRepository,
+            MessageResolver messageResolver
+    ) {
         this.organizationRepository = organizationRepository;
+        this.messageResolver = messageResolver;
     }
 
     @GetMapping
@@ -48,7 +54,10 @@ public class OrganizationsController {
 
         if (organization.isEmpty()) {
             return ErrorResponseAssembler.toResponseEntity(
-                    ApplicationError.notFound("Organization")
+                    new ApplicationError(
+                            "RESOURCE_NOT_FOUND",
+                            messageResolver.get("iam.organization.notFound")
+                    )
             );
         }
 
@@ -66,13 +75,17 @@ public class OrganizationsController {
     ) {
         if (organizationRepository.existsByRuc(resource.ruc())) {
             return ErrorResponseAssembler.toResponseEntity(
-                    ApplicationError.conflict("An organization with this RUC already exists.")
+                    ApplicationError.conflict(
+                            messageResolver.get("iam.organization.rucConflict")
+                    )
             );
         }
 
         if (organizationRepository.existsByEmail(resource.email())) {
             return ErrorResponseAssembler.toResponseEntity(
-                    ApplicationError.conflict("An organization with this email already exists.")
+                    ApplicationError.conflict(
+                            messageResolver.get("iam.organization.emailConflict")
+                    )
             );
         }
 
