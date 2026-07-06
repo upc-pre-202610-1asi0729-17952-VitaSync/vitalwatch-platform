@@ -4,6 +4,7 @@ import com.vitalwatch.center.platform.iam.infrastructure.persistence.jpa.entitie
 import com.vitalwatch.center.platform.iam.infrastructure.persistence.jpa.repositories.OrganizationJpaRepository;
 import com.vitalwatch.center.platform.iam.infrastructure.persistence.jpa.repositories.UserJpaRepository;
 import com.vitalwatch.center.platform.iam.interfaces.rest.resources.CreateUserResource;
+import com.vitalwatch.center.platform.iam.interfaces.rest.resources.UpdateUserResource;
 import com.vitalwatch.center.platform.iam.interfaces.rest.resources.UserResource;
 import com.vitalwatch.center.platform.iam.interfaces.rest.transform.UserResourceFromEntityAssembler;
 import com.vitalwatch.center.platform.shared.application.result.ApplicationError;
@@ -16,6 +17,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -121,5 +123,54 @@ public class UsersController {
         return ResponseEntity
                 .created(URI.create("/users/" + savedUser.getId()))
                 .body(userResource);
+    }
+
+    @PatchMapping("/{userId}")
+    @Operation(summary = "Update user profile, role or status")
+    public ResponseEntity<?> updateUser(
+            @PathVariable Long userId,
+            @Valid @RequestBody UpdateUserResource resource
+    ) {
+        var userOptional = userRepository.findById(userId);
+
+        if (userOptional.isEmpty()) {
+            return ErrorResponseAssembler.toResponseEntity(
+                    ApplicationError.notFound("User")
+            );
+        }
+
+        var user = userOptional.get();
+
+        if (resource.firstName() != null && !resource.firstName().isBlank()) {
+            user.setFirstName(resource.firstName());
+        }
+
+        if (resource.lastName() != null && !resource.lastName().isBlank()) {
+            user.setLastName(resource.lastName());
+        }
+
+        if (resource.role() != null) {
+            user.assignRole(resource.role());
+        }
+
+        if (resource.status() != null) {
+            user.setStatus(resource.status());
+        }
+
+        if (resource.specialtyId() != null) {
+            user.setSpecialtyId(resource.specialtyId());
+        }
+
+        if (resource.workAreaId() != null) {
+            user.setWorkAreaId(resource.workAreaId());
+        }
+
+        user.setUpdatedAt(LocalDateTime.now());
+
+        var savedUser = userRepository.save(user);
+
+        var userResource = UserResourceFromEntityAssembler.toResourceFromEntity(savedUser);
+
+        return ResponseEntity.ok(userResource);
     }
 }
