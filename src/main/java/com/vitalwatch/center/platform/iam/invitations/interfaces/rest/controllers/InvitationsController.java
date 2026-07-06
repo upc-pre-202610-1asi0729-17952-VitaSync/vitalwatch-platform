@@ -256,8 +256,16 @@ public class InvitationsController {
                 foundInvitation.getOrganization()
         );
 
-        user.setSpecialtyId(foundInvitation.getSpecialtyId());
-        user.setWorkAreaId(foundInvitation.getWorkAreaId());
+        var selectedSpecialtyId = resource.specialtyId() != null && resource.specialtyId() > 0
+                ? resource.specialtyId()
+                : foundInvitation.getSpecialtyId();
+
+        var selectedWorkAreaId = resource.workAreaId() != null && resource.workAreaId() > 0
+                ? resource.workAreaId()
+                : foundInvitation.getWorkAreaId();
+
+        user.setSpecialtyId(selectedSpecialtyId);
+        user.setWorkAreaId(selectedWorkAreaId);
 
         var savedUser = userRepository.save(user);
 

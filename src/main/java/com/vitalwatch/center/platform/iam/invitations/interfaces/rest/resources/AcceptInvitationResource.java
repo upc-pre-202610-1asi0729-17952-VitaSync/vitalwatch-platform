@@ -24,6 +24,10 @@ public record AcceptInvitationResource(
 
         @NotBlank
         @Size(min = 6, max = 80)
-        String password
+        String password,
+
+        Long specialtyId,
+
+        Long workAreaId
 ) {
 }
