@@ -51,6 +51,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                         .requestMatchers(HttpMethod.POST, "/authentication/sign-in").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/authentication/sign-up").permitAll()
                         .requestMatchers(HttpMethod.GET, "/authentication/me").authenticated()
 
                         /*
