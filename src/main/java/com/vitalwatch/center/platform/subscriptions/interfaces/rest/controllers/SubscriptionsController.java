@@ -10,6 +10,7 @@ import com.vitalwatch.center.platform.subscriptions.infrastructure.persistence.j
 import com.vitalwatch.center.platform.subscriptions.infrastructure.persistence.jpa.repositories.SubscriptionJpaRepository;
 import com.vitalwatch.center.platform.subscriptions.interfaces.rest.resources.CreateSubscriptionResource;
 import com.vitalwatch.center.platform.subscriptions.interfaces.rest.resources.SubscriptionResource;
+import com.vitalwatch.center.platform.subscriptions.interfaces.rest.resources.UpdateSubscriptionResource;
 import com.vitalwatch.center.platform.subscriptions.interfaces.rest.transform.SubscriptionResourceFromEntityAssembler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -152,5 +154,45 @@ public class SubscriptionsController {
         return ResponseEntity
                 .created(URI.create("/subscriptions/" + savedSubscription.getId()))
                 .body(subscriptionResource);
+    }
+
+    @PatchMapping("/{subscriptionId}")
+    @Operation(summary = "Update subscription plan")
+    public ResponseEntity<?> updateSubscription(
+            @PathVariable Long subscriptionId,
+            @Valid @RequestBody UpdateSubscriptionResource resource
+    ) {
+        var subscription = subscriptionRepository.findById(subscriptionId);
+
+        if (subscription.isEmpty()) {
+            return ErrorResponseAssembler.toResponseEntity(
+                    new ApplicationError(
+                            "RESOURCE_NOT_FOUND",
+                            messageResolver.get("subscriptions.subscription.notFound")
+                    )
+            );
+        }
+
+        var plan = planRepository.findById(resource.planId());
+
+        if (plan.isEmpty()) {
+            return ErrorResponseAssembler.toResponseEntity(
+                    new ApplicationError(
+                            "RESOURCE_NOT_FOUND",
+                            messageResolver.get("subscriptions.plan.notFound")
+                    )
+            );
+        }
+
+        var subscriptionToUpdate = subscription.get();
+        subscriptionToUpdate.setPlan(plan.get());
+        subscriptionToUpdate.setUpdatedAt(LocalDateTime.now());
+
+        var savedSubscription = subscriptionRepository.save(subscriptionToUpdate);
+
+        var subscriptionResource = SubscriptionResourceFromEntityAssembler
+                .toResourceFromEntity(savedSubscription);
+
+        return ResponseEntity.ok(subscriptionResource);
     }
 }
