@@ -12,6 +12,7 @@ import com.vitalwatch.center.platform.subscriptions.interfaces.rest.resources.Cr
 import com.vitalwatch.center.platform.subscriptions.interfaces.rest.resources.SubscriptionResource;
 import com.vitalwatch.center.platform.subscriptions.interfaces.rest.resources.UpdateSubscriptionResource;
 import com.vitalwatch.center.platform.subscriptions.interfaces.rest.transform.SubscriptionResourceFromEntityAssembler;
+import org.springframework.transaction.annotation.Transactional;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -157,6 +158,7 @@ public class SubscriptionsController {
     }
 
     @PatchMapping("/{subscriptionId}")
+    @Transactional
     @Operation(summary = "Update subscription plan")
     public ResponseEntity<?> updateSubscription(
             @PathVariable Long subscriptionId,
@@ -185,6 +187,7 @@ public class SubscriptionsController {
         }
 
         var subscriptionToUpdate = subscription.get();
+
         subscriptionToUpdate.setPlan(plan.get());
         subscriptionToUpdate.setUpdatedAt(LocalDateTime.now());
 
