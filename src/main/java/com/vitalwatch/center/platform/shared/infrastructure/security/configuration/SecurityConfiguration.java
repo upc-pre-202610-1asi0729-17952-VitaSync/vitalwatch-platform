@@ -78,6 +78,15 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/subscriptions")
                         .hasRole("HOSPITAL_ADMIN")
 
+                        .requestMatchers(HttpMethod.GET, "/invitations/by-token/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/invitations/accept").permitAll()
+
+                        .requestMatchers(HttpMethod.GET, "/invitations/**")
+                        .hasRole("HOSPITAL_ADMIN")
+
+                        .requestMatchers(HttpMethod.POST, "/invitations/send")
+                        .hasRole("HOSPITAL_ADMIN")
+
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
