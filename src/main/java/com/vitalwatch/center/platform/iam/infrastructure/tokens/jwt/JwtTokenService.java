@@ -2,6 +2,7 @@ package com.vitalwatch.center.platform.iam.infrastructure.tokens.jwt;
 
 import com.vitalwatch.center.platform.iam.application.internal.outboundservices.TokenService;
 import com.vitalwatch.center.platform.iam.infrastructure.persistence.jpa.entities.UserJpaEntity;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -45,6 +46,32 @@ public class JwtTokenService implements TokenService {
                 .expiration(Date.from(expiration))
                 .signWith(getSigningKey())
                 .compact();
+    }
+
+    @Override
+    public String extractSubject(String token) {
+        return extractAllClaims(token).getSubject();
+    }
+
+    @Override
+    public boolean isTokenValid(String token, UserJpaEntity user) {
+        var subject = extractSubject(token);
+
+        return subject.equals(user.getEmail()) && !isTokenExpired(token);
+    }
+
+    private boolean isTokenExpired(String token) {
+        return extractAllClaims(token)
+                .getExpiration()
+                .before(new Date());
+    }
+
+    private Claims extractAllClaims(String token) {
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
     }
 
     private SecretKey getSigningKey() {
