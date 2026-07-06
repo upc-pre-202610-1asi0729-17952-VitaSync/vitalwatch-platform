@@ -86,4 +86,9 @@ public class CheckoutSessionJpaEntity {
         this.status = CheckoutSessionStatus.EXPIRED;
         this.updatedAt = LocalDateTime.now();
     }
+
+    public void complete() {
+        this.status = CheckoutSessionStatus.COMPLETED;
+        this.updatedAt = LocalDateTime.now();
+    }
 }
