@@ -28,7 +28,8 @@ public final class CheckoutSessionResourceFromEntityAssembler {
                 entity.getPlan().getName(),
                 entity.getPlan().getPrice(),
                 entity.getPlan().getCurrency(),
-                entity.getPlan().getBillingPeriod()
+                entity.getPlan().getBillingPeriod(),
+                entity.getCreatedAt()
         );
     }
 }

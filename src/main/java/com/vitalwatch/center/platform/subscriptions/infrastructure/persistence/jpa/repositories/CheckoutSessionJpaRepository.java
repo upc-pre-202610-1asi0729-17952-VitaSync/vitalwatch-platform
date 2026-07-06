@@ -4,6 +4,7 @@ import com.vitalwatch.center.platform.subscriptions.infrastructure.persistence.j
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -13,4 +14,7 @@ public interface CheckoutSessionJpaRepository extends JpaRepository<CheckoutSess
 
     @EntityGraph(attributePaths = {"organization", "plan"})
     Optional<CheckoutSessionJpaEntity> findBySessionId(String sessionId);
+
+    @EntityGraph(attributePaths = {"organization", "plan"})
+    List<CheckoutSessionJpaEntity> findByOrganization_IdOrderByCreatedAtDesc(Long organizationId);
 }
