@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 
 import java.util.List;
 
@@ -31,7 +32,7 @@ public class PlansController {
         this.planRepository = planRepository;
         this.messageResolver = messageResolver;
     }
-
+    @SecurityRequirements()
     @GetMapping
     @Operation(summary = "Get all subscription plans")
     public ResponseEntity<List<PlanResource>> getAllPlans() {
@@ -42,7 +43,7 @@ public class PlansController {
 
         return ResponseEntity.ok(plans);
     }
-
+    @SecurityRequirements()
     @GetMapping("/{planId}")
     @Operation(summary = "Get subscription plan by id")
     public ResponseEntity<?> getPlanById(@PathVariable Long planId) {
@@ -61,7 +62,7 @@ public class PlansController {
 
         return ResponseEntity.ok(resource);
     }
-
+    @SecurityRequirements()
     @GetMapping("/by-code/{code}")
     @Operation(summary = "Get subscription plan by code")
     public ResponseEntity<?> getPlanByCode(@PathVariable String code) {

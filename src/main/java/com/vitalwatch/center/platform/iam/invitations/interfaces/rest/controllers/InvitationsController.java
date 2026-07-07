@@ -23,6 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -99,6 +100,7 @@ public class InvitationsController {
         return ResponseEntity.ok(resource);
     }
 
+    @SecurityRequirements()
     @GetMapping("/by-token/{token}")
     @Operation(summary = "Get invitation by token")
     public ResponseEntity<?> getInvitationByToken(@PathVariable String token) {
@@ -193,6 +195,7 @@ public class InvitationsController {
         return ResponseEntity.status(HttpStatus.CREATED).body(invitationResource);
     }
 
+    @SecurityRequirements()
     @PostMapping("/accept")
     @Operation(summary = "Accept invitation and create user account")
     public ResponseEntity<?> acceptInvitation(
