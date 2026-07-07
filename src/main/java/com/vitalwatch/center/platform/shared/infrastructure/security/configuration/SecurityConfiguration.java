@@ -73,7 +73,7 @@ public class SecurityConfiguration {
                         .hasAnyRole("HOSPITAL_ADMIN", "SUPERVISOR")
 
                         .requestMatchers(HttpMethod.GET, "/subscriptions/**")
-                        .hasRole("HOSPITAL_ADMIN")
+                        .hasAnyRole("HOSPITAL_ADMIN", "SUPERVISOR", "DOCTOR")
 
                         .requestMatchers(HttpMethod.POST, "/subscriptions")
                         .hasRole("HOSPITAL_ADMIN")
