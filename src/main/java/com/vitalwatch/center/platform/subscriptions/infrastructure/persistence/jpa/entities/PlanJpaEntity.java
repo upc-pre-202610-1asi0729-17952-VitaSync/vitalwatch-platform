@@ -81,7 +81,7 @@ public class PlanJpaEntity {
     )
     @Column(name = "feature_key", nullable = false, length = 120)
     private List<String> featureKeys = new ArrayList<>();
-
+        // Módulos que permanecen deshabilitados según el plan contratado.
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(
             name = "plan_disabled_module_keys",
@@ -89,7 +89,7 @@ public class PlanJpaEntity {
     )
     @Column(name = "disabled_module_key", nullable = false, length = 120)
     private List<String> disabledModuleKeys = new ArrayList<>();
-
+        // Fecha de creación del registro.
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
