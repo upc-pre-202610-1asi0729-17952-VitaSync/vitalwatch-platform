@@ -20,6 +20,10 @@ import java.util.Random;
 @Service
 public class ClinicalSimulationService {
 
+    private static final int MAX_READINGS_PER_USER = 60;
+    private static final int MAX_ALERTS_PER_USER = 10;
+    private static final int MAX_ANOMALIES_PER_USER = 10;
+
     private final UserJpaRepository userRepository;
     private final OrganizationJpaRepository organizationRepository;
     private final VitalSignReadingJpaRepository vitalSignReadingRepository;
@@ -190,6 +194,34 @@ public class ClinicalSimulationService {
             vitalSignAnomalyRepository.save(anomaly);
             counters.anomaliesCreated++;
         }
+
+        deleteOldReadingsForDoctor(organizationId, userId);
+        deleteOldAlertsForDoctor(organizationId, userId);
+        deleteOldAnomaliesForDoctor(organizationId, userId);
+    }
+
+    private void deleteOldReadingsForDoctor(Long organizationId, Long userId) {
+        vitalSignReadingRepository.deleteOlderThanLatestByOrganizationAndUser(
+                organizationId,
+                userId,
+                MAX_READINGS_PER_USER
+        );
+    }
+
+    private void deleteOldAlertsForDoctor(Long organizationId, Long userId) {
+        clinicalAlertRepository.deleteOlderThanLatestByOrganizationAndUser(
+                organizationId,
+                userId,
+                MAX_ALERTS_PER_USER
+        );
+    }
+
+    private void deleteOldAnomaliesForDoctor(Long organizationId, Long userId) {
+        vitalSignAnomalyRepository.deleteOlderThanLatestByOrganizationAndUser(
+                organizationId,
+                userId,
+                MAX_ANOMALIES_PER_USER
+        );
     }
 
     private SensorStatus generateSensorStatus() {
