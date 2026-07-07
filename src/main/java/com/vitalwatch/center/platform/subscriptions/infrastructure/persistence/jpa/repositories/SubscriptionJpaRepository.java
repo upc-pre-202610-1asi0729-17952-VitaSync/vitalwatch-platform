@@ -24,5 +24,14 @@ public interface SubscriptionJpaRepository extends JpaRepository<SubscriptionJpa
     @EntityGraph(attributePaths = {"organization", "plan"})
     List<SubscriptionJpaEntity> findByOrganization_Id(Long organizationId);
 
+    @EntityGraph(attributePaths = {"organization", "plan"})
+    List<SubscriptionJpaEntity> findByOrganization_IdOrderByUpdatedAtDesc(Long organizationId);
+
+    @EntityGraph(attributePaths = {"organization", "plan"})
+    Optional<SubscriptionJpaEntity> findFirstByOrganization_IdAndStatusOrderByUpdatedAtDesc(
+            Long organizationId,
+            SubscriptionStatus status
+    );
+
     boolean existsByOrganization_IdAndStatus(Long organizationId, SubscriptionStatus status);
 }

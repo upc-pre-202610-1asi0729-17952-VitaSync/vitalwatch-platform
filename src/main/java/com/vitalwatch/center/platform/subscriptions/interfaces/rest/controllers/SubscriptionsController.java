@@ -82,11 +82,25 @@ public class SubscriptionsController {
     }
 
     @GetMapping("/organization/{organizationId}")
-    @Operation(summary = "Get subscriptions by organization id")
+    @Operation(summary = "Get current subscription by organization id")
     public ResponseEntity<List<SubscriptionResource>> getSubscriptionsByOrganizationId(
             @PathVariable Long organizationId
     ) {
-        var subscriptions = subscriptionRepository.findByOrganization_Id(organizationId)
+        var activeSubscription = subscriptionRepository
+                .findFirstByOrganization_IdAndStatusOrderByUpdatedAtDesc(
+                        organizationId,
+                        SubscriptionStatus.ACTIVE
+                );
+
+        if (activeSubscription.isPresent()) {
+            var resource = SubscriptionResourceFromEntityAssembler
+                    .toResourceFromEntity(activeSubscription.get());
+
+            return ResponseEntity.ok(List.of(resource));
+        }
+
+        var subscriptions = subscriptionRepository
+                .findByOrganization_IdOrderByUpdatedAtDesc(organizationId)
                 .stream()
                 .map(SubscriptionResourceFromEntityAssembler::toResourceFromEntity)
                 .toList();
