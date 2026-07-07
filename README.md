@@ -202,7 +202,7 @@ Install the following tools before running the project:
 
 - Java 26
 - Maven, or use the included Maven Wrapper
-- MySQL 8.x
+- MySQL 8.0
 - Docker Desktop
 - Git
 - IntelliJ IDEA or another Java IDE
