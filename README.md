@@ -761,7 +761,7 @@ feature/audit-compliance
 
 VitalWatch Team
 
-Course project developed for academic purposes.
+Course project developed for academic purposes (from UPC).
 
 ---
 
