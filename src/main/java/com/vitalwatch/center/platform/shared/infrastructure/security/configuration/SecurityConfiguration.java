@@ -58,6 +58,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/billing/create-checkout-session").permitAll()
                         .requestMatchers(HttpMethod.GET, "/billing/checkout-session-status").permitAll()
                         .requestMatchers(HttpMethod.POST, "/billing/activate-checkout-session").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/billing/webhook").permitAll()
 
                         /*
                          * Temporarily public while the registration, checkout,

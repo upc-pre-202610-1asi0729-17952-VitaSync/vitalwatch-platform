@@ -31,7 +31,7 @@ public class CheckoutSessionJpaEntity {
     @Column(name = "session_id", nullable = false, length = 120)
     private String sessionId;
 
-    @Column(name = "checkout_url", nullable = false, length = 500)
+    @Column(name = "checkout_url", nullable = false, length = 2048)
     private String checkoutUrl;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -72,7 +72,7 @@ public class CheckoutSessionJpaEntity {
         this.plan = plan;
         this.successUrl = successUrl;
         this.cancelUrl = cancelUrl;
-        this.status = CheckoutSessionStatus.COMPLETED;
+        this.status = CheckoutSessionStatus.PENDING;
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }
