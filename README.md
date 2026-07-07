@@ -756,6 +756,13 @@ feature/audit-compliance
 ```
 
 ---
+---
+
+## Current Backend Status
+
+The VitalWatch Platform API is currently prepared for local testing and frontend integration. The main bounded contexts are implemented, Swagger documentation is available, and the backend can be executed locally or with Docker.
+
+Some production features, such as real payment processing, production secrets configuration, and complete cloud validation, should be configured according to the final deployment environment.
 
 ## Author
 
