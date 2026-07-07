@@ -25,6 +25,12 @@ public class StripeCheckoutService {
     private final String secretKey;
     private final String webhookSecret;
 
+
+       /**
+        * Inyecta la configuración necesaria para trabajar con Stripe.
+        * Los valores se leen desde las propiedades de la aplicación.
+        */
+
     public StripeCheckoutService(
             @Value("${application.billing.stripe.enabled:false}") boolean enabled,
             @Value("${application.billing.stripe.secret-key:}") String secretKey,
@@ -75,6 +81,8 @@ public class StripeCheckoutService {
                                 )
                                 .build()
                 )
+                // Se guardan metadatos para poder relacionar la sesión de Stripe con datos internos del sistema
+
                 .putMetadata("planId", plan.getId().toString())
                 .putMetadata("planCode", plan.getCode());
 
