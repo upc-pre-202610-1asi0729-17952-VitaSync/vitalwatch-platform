@@ -19,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 
 /**
  * REST controller for authentication endpoints.
@@ -48,6 +49,7 @@ public class AuthenticationController {
         this.messageResolver = messageResolver;
     }
 
+    @SecurityRequirements()
     @PostMapping("/sign-in")
     @Operation(summary = "Sign in with email and password")
     public ResponseEntity<?> signIn(
@@ -81,6 +83,7 @@ public class AuthenticationController {
         return ResponseEntity.ok(authenticatedUserResource);
     }
 
+    @SecurityRequirements()
     @PostMapping("/sign-up")
     @Operation(summary = "Register a new user and return authentication token")
     public ResponseEntity<?> signUp(
